@@ -2,6 +2,28 @@ import requests
 import xml.etree.ElementTree as ET
 import os
 from pathlib import Path
+import ftplib
+from datetime import datetime
+
+def upload_to_ftp(local_file_path, ftp_host, ftp_user, ftp_pass, ftp_path="/"):
+    """
+    FTP ile dosyayı hosting'e yükler
+    """
+    try:
+        # FTP bağlantısı
+        ftp = ftplib.FTP(ftp_host)
+        ftp.login(ftp_user, ftp_pass)
+        
+        # Dosyayı yükle
+        with open(local_file_path, 'rb') as file:
+            ftp.storbinary(f'STOR {ftp_path}/baciodeneme.xml', file)
+        
+        print(f"Dosya başarıyla FTP'ye yüklendi: {ftp_host}{ftp_path}/baciodeneme.xml")
+        ftp.quit()
+        return True
+    except Exception as e:
+        print(f"FTP yükleme hatası: {e}")
+        return False
 
 def download_xml(url):
     print(f"XML indiriliyor: {url}")
@@ -157,20 +179,34 @@ def convert_and_save_xml(source_xml_content, output_filename="baciodeneme.xml"):
         print(f"  Total Qty: {total_qty}")
         ET.SubElement(new_product, "quantity").text = total_qty
 
-    # Masaüstü yolu
-    desktop = Path.home() / "Desktop"
-    output_path = desktop / output_filename
+    # Geçici dosya yolu
+    temp_path = Path.cwd() / output_filename
 
     # XML'i kaydet
     tree = ET.ElementTree(new_root)
-    tree.write(output_path, encoding="utf-8", xml_declaration=True)
-    print(f"\nXML başarıyla kaydedildi: {output_path}")
+    tree.write(temp_path, encoding="utf-8", xml_declaration=True)
+    print(f"\nXML başarıyla kaydedildi: {temp_path}")
+    
+    return temp_path
 
 def main():
+    # FTP ayarları - bunları kendi hosting bilgilerinizle değiştirin
+    FTP_HOST = "ftp.eterella.com"  # FTP sunucu adresi
+    FTP_USER = "windamdx"       # FTP kullanıcı adı
+    FTP_PASS = "c_bJ!-PGMwG57#Hx"       # FTP şifresi
+    FTP_PATH = "/public_html/yasinxml/"        # Yüklenecek dizin
+    
     url = "https://bacioicgiyim.com.tr/priodcutsxml/products.xml"
     try:
         xml_content = download_xml(url)
-        convert_and_save_xml(xml_content)
+        local_file_path = convert_and_save_xml(xml_content)
+        
+        # FTP'ye yükle
+        if upload_to_ftp(local_file_path, FTP_HOST, FTP_USER, FTP_PASS, FTP_PATH):
+            print("✅ XML dosyası başarıyla hosting'e yüklendi!")
+        else:
+            print("❌ FTP yükleme başarısız!")
+            
     except Exception as e:
         print(f"Hata oluştu: {e}")
 
